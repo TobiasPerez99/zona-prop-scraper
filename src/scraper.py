@@ -176,9 +176,6 @@ class Scraper:
         """
         estate = {}
 
-        print(estate_post)
-        return
-
         # ID y títulos
         estate['posting_id'] = estate_post.get('postingId', '')
         estate['title'] = estate_post.get('title', '')
@@ -187,19 +184,36 @@ class Scraper:
         # URL
         estate['url'] = 'https://www.zonaprop.com.ar' + estate_post.get('url', '')
 
-        # Precio
+        # Precio y tipo de operación
         price_operations = estate_post.get('priceOperationTypes', [])
+        estate['sell_price'] = None
+        estate['sell_currency'] = None
+        estate['rent_price'] = None
+        estate['rent_currency'] = None
+        estate['price_value'] = ''  # Para CSV
+        estate['price_currency'] = ''  # Para CSV
+
         if price_operations and len(price_operations) > 0:
-            prices = price_operations[0].get('prices', [])
+            operation = price_operations[0]
+            operation_type = operation.get('operationType', {})
+            operation_type_id = operation_type.get('operationTypeId', '')
+
+            prices = operation.get('prices', [])
             if prices and len(prices) > 0:
-                estate['price_value'] = prices[0].get('amount', '')
-                estate['price_currency'] = prices[0].get('currency', '')
-            else:
-                estate['price_value'] = ''
-                estate['price_currency'] = ''
-        else:
-            estate['price_value'] = ''
-            estate['price_currency'] = ''
+                amount = prices[0].get('amount', '')
+                currency = prices[0].get('currency', '')
+
+                # Para CSV (compatibilidad)
+                estate['price_value'] = amount
+                estate['price_currency'] = currency
+
+                # Para BD: diferenciar venta/alquiler
+                if operation_type_id == '1':  # Venta
+                    estate['sell_price'] = amount
+                    estate['sell_currency'] = currency
+                elif operation_type_id == '2':  # Alquiler
+                    estate['rent_price'] = amount
+                    estate['rent_currency'] = currency
 
         # Expensas
         expenses = estate_post.get('expenses')
@@ -259,20 +273,24 @@ class Scraper:
         publisher = estate_post.get('publisher', {})
         estate['publisher_name'] = publisher.get('name', '')
         estate['publisher_id'] = publisher.get('publisherId', '')
+        estate['publisher_url'] = 'https://www.zonaprop.com.ar' + publisher.get('url', '') if publisher.get('url') else ''
+        estate['publisher_logo_url'] = publisher.get('urlLogo', '')
+        estate['publisher_phone'] = estate_post.get('whatsApp', '')
 
         # Ubicación
-        posting_location = estate_post.get('postingLocation', {})
+        posting_location = estate_post.get('postingLocation') or {}
 
         # Dirección
-        address = posting_location.get('address', {})
+        address = posting_location.get('address') or {}
         estate['address'] = address.get('name', '')
 
         # Barrio/zona
-        location = posting_location.get('location', {})
+        location = posting_location.get('location') or {}
         estate['location'] = location.get('name', '')
+        estate['location_id_raw'] = location.get('locationId', '')  # Para convertir a int en database.py
 
         # Ciudad
-        parent_location = location.get('parent', {})
+        parent_location = location.get('parent') or {}
         estate['city'] = parent_location.get('name', '')
 
         # Descripción
@@ -281,6 +299,20 @@ class Scraper:
         # Tipo de propiedad
         real_estate_type = estate_post.get('realEstateType', {})
         estate['property_type'] = real_estate_type.get('name', '')
+
+        # Fecha de creación/modificación
+        estate['created_at'] = estate_post.get('modified_date', '')
+
+        # Imágenes
+        visible_pictures = estate_post.get('visiblePictures', {})
+        pictures = visible_pictures.get('pictures', [])
+        estate['images'] = []
+
+        for pic in pictures:
+            estate['images'].append({
+                'url': pic.get('url730x532', ''),
+                'order': pic.get('order', 0)
+            })
 
         return estate
 
