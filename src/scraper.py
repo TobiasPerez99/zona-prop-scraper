@@ -28,6 +28,16 @@ class Scraper:
     def __init__(self, browser, base_url):
         self.browser = browser
         self.base_url = base_url
+        self.db_session = None  # Será inicializada si se habilita guardado en BD
+
+    def enable_database_save(self, session):
+        """
+        Habilita guardado automático en BD durante scraping
+
+        Args:
+            session: Sesión de SQLAlchemy para guardar en BD
+        """
+        self.db_session = session
 
     def scrap_page(self, page_number):
         if page_number == 1:
@@ -94,6 +104,17 @@ class Scraper:
         estates = []
         for estate_post in estate_posts:
             estate = self.parse_estate(estate_post)
+
+            # Guardar en BD si está habilitado
+            if self.db_session:
+                try:
+                    from src.database import save_property_to_db
+                    save_property_to_db(self.db_session, estate)
+                    print(f"[OK] Propiedad {estate.get('posting_id')} guardada en BD")
+                except Exception as e:
+                    print(f"[ERROR] Error guardando {estate.get('posting_id')}: {e}")
+                    # No detener el scraping por error de BD
+
             estates.append(estate)
         return estates
 

@@ -92,18 +92,17 @@ class Image(Base):
     """
     Tabla: images
     Representa las imágenes de las propiedades
-    Tiene clave primaria compuesta: (property_id, source_id)
     """
     __tablename__ = 'images'
 
-    property_id = Column(Integer, primary_key=True)
-    source_id = Column(Integer, ForeignKey('sources_data.id'), primary_key=True)
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    property_id = Column(Integer)
+    source_id = Column(Integer, ForeignKey('sources_data.id'))
     image_url = Column(String(255))
     order = Column(Integer)
 
     # Relaciones
     source = relationship('SourceData', back_populates='images')
-    # No definir relación con Property debido a complejidad de FK compuestas
 
     def __repr__(self):
-        return f"<Image(property_id={self.property_id}, order={self.order})>"
+        return f"<Image(id={self.id}, property_id={self.property_id}, order={self.order})>"
